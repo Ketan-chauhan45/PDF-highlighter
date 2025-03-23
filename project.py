@@ -1,4 +1,3 @@
-# project.py
 from sentence_transformers import SentenceTransformer
 import torch
 import os
@@ -37,22 +36,21 @@ class Project:
                         })
         return self.lines
 
-    def find_relevant_lines_with_genai(self):
+    def relevant_lines(self):
         all_texts = [line['text'] for line in self.lines]
         numbered_lines = "\n".join([f"{i+1}. {text}" for i, text in enumerate(all_texts)])
         
         prompt = f"""
-            You are a helpful assistant. A user is trying to find the lines in a PDF that are most relevant to this query:
-            
-            Query: "{self.query}"
-            
-            Here are the lines from the PDF:
-            {numbered_lines}
-            
-            Please return only the numbers of the lines that are directly relevant to the query.
-            Respond with a comma-separated list of line numbers. Example: 2, 5, 9
-                """
-
+You are a helpful assistant. A user is trying to find the lines in a PDF that are most relevant to this query:
+                
+Query: "{self.query}"
+                
+Here are the lines from the PDF:
+{numbered_lines}
+                
+Please return only the numbers of the lines that are directly relevant to the query.
+Respond with a comma-separated list of line numbers. Example: 2, 5, 9
+"""
         try:
             response = openai.ChatCompletion.create(
                 model="gpt-4",
@@ -60,15 +58,13 @@ class Project:
                 temperature=0.3,
                 max_tokens=200
             )
-    
+            
             output = response['choices'][0]['message']['content']
             line_nums = [int(num.strip()) - 1 for num in output.split(',') if num.strip().isdigit()]
             return [self.lines[i] for i in line_nums if 0 <= i < len(self.lines)]
-    
         except Exception as e:
             print("Error in GenAI search:", e)
             return []
-
 
     def highlight_pdf(self, matching_lines):
         annotator = PdfAnnotator(self.pdf_path)
@@ -89,16 +85,15 @@ class Project:
                 )
         annotator.write(self.output_pdf_path)
 
-     def run(self):
+    def run(self):
         self.extract_text()
         if not self.lines:
             return "No text extracted from the PDF."
         
-        matching_lines = self.find_relevant_lines_with_genai()
+        matching_lines = self.relevant_lines()
         
         if not matching_lines:
             return "No matching lines found using GenAI."
         
         self.highlight_pdf(matching_lines)
         return f"Highlighted PDF saved to: {self.output_pdf_path}"
-
