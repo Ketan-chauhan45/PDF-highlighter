@@ -6,6 +6,9 @@ from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import AnnotationBuilder
 from pdf_annotate import PdfAnnotator, Location, Appearance
 import pdfplumber
+import openai
+
+openai.api_key = os.getenv("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")
 
 class Project:
     def __init__(self, pdf_path, model_path, query, threshold, output_pdf_path=None):
@@ -34,29 +37,38 @@ class Project:
                         })
         return self.lines
 
-    def make_embeddings(self):
-        model = SentenceTransformer(self.model_path)
-        line_texts = [line['text'] for line in self.lines]
-        line_emb = model.encode(line_texts, convert_to_tensor=True)
-        q_emb = model.encode(self.query, convert_to_tensor=True)
-        return line_emb, q_emb
+    def find_relevant_lines_with_genai(self):
+        all_texts = [line['text'] for line in self.lines]
+        numbered_lines = "\n".join([f"{i+1}. {text}" for i, text in enumerate(all_texts)])
+        
+        prompt = f"""
+            You are a helpful assistant. A user is trying to find the lines in a PDF that are most relevant to this query:
+            
+            Query: "{self.query}"
+            
+            Here are the lines from the PDF:
+            {numbered_lines}
+            
+            Please return only the numbers of the lines that are directly relevant to the query.
+            Respond with a comma-separated list of line numbers. Example: 2, 5, 9
+                """
 
-    def find_matching_lines(self, line_emb, q_emb):
-        similarity = torch.nn.functional.cosine_similarity(line_emb, q_emb.unsqueeze(0), dim=1)
-        matching_lines = []
-        for i, sim in enumerate(similarity):
-            if sim >= self.threshold:
-                line_info = self.lines[i]
-                matching_lines.append({
-                    'text': line_info['text'],
-                    'page': line_info['page'],
-                    'x0': line_info['x0'],
-                    'top': line_info['top'],
-                    'x1': line_info['x1'],
-                    'bottom': line_info['bottom'],
-                    'similarity': sim.item()
-                })
-        return matching_lines
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=200
+            )
+    
+            output = response['choices'][0]['message']['content']
+            line_nums = [int(num.strip()) - 1 for num in output.split(',') if num.strip().isdigit()]
+            return [self.lines[i] for i in line_nums if 0 <= i < len(self.lines)]
+    
+        except Exception as e:
+            print("Error in GenAI search:", e)
+            return []
+
 
     def highlight_pdf(self, matching_lines):
         annotator = PdfAnnotator(self.pdf_path)
@@ -77,13 +89,16 @@ class Project:
                 )
         annotator.write(self.output_pdf_path)
 
-    def run(self):
+     def run(self):
         self.extract_text()
         if not self.lines:
             return "No text extracted from the PDF."
-        line_emb, q_emb = self.make_embeddings()
-        matching_lines = self.find_matching_lines(line_emb, q_emb)
+        
+        matching_lines = self.find_relevant_lines_with_genai()
+        
         if not matching_lines:
-            return "No matching lines found above threshold."
+            return "No matching lines found using GenAI."
+        
         self.highlight_pdf(matching_lines)
         return f"Highlighted PDF saved to: {self.output_pdf_path}"
+
