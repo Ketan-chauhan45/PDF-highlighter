@@ -4,3 +4,4 @@ PyPDF2
 pdf-annotate
 sentence-transformers
 torch
+openai
