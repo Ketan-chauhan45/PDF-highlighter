@@ -44,13 +44,13 @@ def index():
         output_pdf_path = os.path.join(UPLOAD_FOLDER, output_pdf_filename)
         
         # Run the PDF processing using your Project class
-        model = "sentence-transformers/all-MiniLM-L6-v2"
-        threshold = 0.8
+        # model = "sentence-transformers/all-MiniLM-L6-v2"
+        # threshold = 0.8
         project_instance = Project(
             pdf_path=pdf_path,
-            model_path=model,
+            # model_path=model,
             query=input_query,
-            threshold=threshold,
+            # threshold=threshold,
             output_pdf_path=output_pdf_path
         )
         result = project_instance.run()
