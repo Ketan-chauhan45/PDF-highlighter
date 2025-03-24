@@ -1,6 +1,4 @@
 # project.py
-from sentence_transformers import SentenceTransformer
-import torch
 import os
 from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import AnnotationBuilder
@@ -13,11 +11,9 @@ openai.api_key = "sk-proj-gJ5rggQ2KNVxmm6Cb7nQar5t0XEB9g1-hoM29dhsfLZFBaSeJNK34w
 class Project:
     def __init__(self, pdf_path, model_path, query, threshold, output_pdf_path=None):
         self.pdf_path = pdf_path
-        self.model_path = model_path
-        self.query = query
-        self.threshold = threshold 
+        self.query = query 
         self.output_pdf_path = output_pdf_path or os.path.splitext(pdf_path)[0] + "_highlighted.pdf"
-        self.lines = []  # List of dicts with text and bounding box info
+        self.lines = []  
 
     def extract_text(self):
         self.lines = []
@@ -54,31 +50,15 @@ class Project:
             return None
 
     def find_lines_containing_answer(self, answer):
-    matching = []
-    answer_lower = answer.lower()
-    for line in self.lines:
-        if answer_lower in line["text"].lower():
-            matching.append(line)
-    return matching
+        matching = []
+        answer_lower = answer.lower()
+        for line in self.lines:
+            if answer_lower in line["text"].lower():
+                matching.append(line)
+        return matching
 
 
-    def run(self):
-    self.extract_text()
-    if not self.lines:
-        return "No text extracted from the PDF."
-
-    full_text = "\n".join([line["text"] for line in self.lines])
-
-    # Get the most accurate answer using LLM
-    answer = self.get_answer_from_llm(full_text)
-    if not answer:
-        return "LLM could not extract an answer."
-
-    # Find where this answer exists in PDF text lines
-    matching_lines = self.find_lines_containing_answer(answer)
-    if not matching_lines:
-        return "Answer found, but not located in PDF text for highlighting."
-
+        
     def highlight_pdf(self, matching_lines):
         annotator = PdfAnnotator(self.pdf_path)
         with pdfplumber.open(self.pdf_path) as pdf:
@@ -98,6 +78,23 @@ class Project:
                 )
         annotator.write(self.output_pdf_path)
         
-    self.highlight_pdf(matching_lines)
-    return f"Highlighted PDF saved to: {self.output_pdf_path}"
 
+    def run(self):
+        self.extract_text()
+        if not self.lines:
+            return "No text extracted from the PDF."
+    
+        full_text = "\n".join([line["text"] for line in self.lines])
+    
+        # Get the most accurate answer using LLM
+        answer = self.get_answer_from_llm(full_text)
+        if not answer:
+            return "LLM could not extract an answer."
+    
+        # Find where this answer exists in PDF text lines
+        matching_lines = self.find_lines_containing_answer(answer)
+        if not matching_lines:
+            return "Answer found, but not located in PDF text for highlighting."
+
+        self.highlight_pdf(matching_lines)
+        return f"Highlighted PDF saved to: {self.output_pdf_path}"
