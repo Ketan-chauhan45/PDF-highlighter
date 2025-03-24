@@ -45,7 +45,7 @@ def index():
         
         # Run the PDF processing using your Project class
         model = "sentence-transformers/all-MiniLM-L6-v2"
-        threshold = 0.4
+        threshold = 0.8
         project_instance = Project(
             pdf_path=pdf_path,
             model_path=model,
