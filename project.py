@@ -6,6 +6,9 @@ from PyPDF2 import PdfReader, PdfWriter
 from PyPDF2.generic import AnnotationBuilder
 from pdf_annotate import PdfAnnotator, Location, Appearance
 import pdfplumber
+import openai
+import openai
+openai.api_key = "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"
 
 class Project:
     def __init__(self, pdf_path, model_path, query, threshold, output_pdf_path=None):
@@ -34,29 +37,47 @@ class Project:
                         })
         return self.lines
 
-    def make_embeddings(self):
-        model = SentenceTransformer(self.model_path)
-        line_texts = [line['text'] for line in self.lines]
-        line_emb = model.encode(line_texts, convert_to_tensor=True)
-        q_emb = model.encode(self.query, convert_to_tensor=True)
-        return line_emb, q_emb
+    def get_answer_from_llm(self, pdf_text):
+        try:
+            openai.api_key = os.getenv("OPENAI_API_KEY")  # or set directly
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that finds precise answers from PDF content."},
+                    {"role": "user", "content": f"PDF Content:\n{pdf_text}\n\nQuestion: {self.query}\n\nGive the most accurate and concise answer."}
+                ],
+                temperature=0
+            )
+            return response['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            print("LLM Error:", e)
+            return None
 
-    def find_matching_lines(self, line_emb, q_emb):
-        similarity = torch.nn.functional.cosine_similarity(line_emb, q_emb.unsqueeze(0), dim=1)
-        matching_lines = []
-        for i, sim in enumerate(similarity):
-            if sim >= self.threshold:
-                line_info = self.lines[i]
-                matching_lines.append({
-                    'text': line_info['text'],
-                    'page': line_info['page'],
-                    'x0': line_info['x0'],
-                    'top': line_info['top'],
-                    'x1': line_info['x1'],
-                    'bottom': line_info['bottom'],
-                    'similarity': sim.item()
-                })
-        return matching_lines
+    def find_lines_containing_answer(self, answer):
+    matching = []
+    answer_lower = answer.lower()
+    for line in self.lines:
+        if answer_lower in line["text"].lower():
+            matching.append(line)
+    return matching
+
+
+    def run(self):
+    self.extract_text()
+    if not self.lines:
+        return "No text extracted from the PDF."
+
+    full_text = "\n".join([line["text"] for line in self.lines])
+
+    # Get the most accurate answer using LLM
+    answer = self.get_answer_from_llm(full_text)
+    if not answer:
+        return "LLM could not extract an answer."
+
+    # Find where this answer exists in PDF text lines
+    matching_lines = self.find_lines_containing_answer(answer)
+    if not matching_lines:
+        return "Answer found, but not located in PDF text for highlighting."
 
     def highlight_pdf(self, matching_lines):
         annotator = PdfAnnotator(self.pdf_path)
@@ -76,14 +97,7 @@ class Project:
                     Appearance(stroke_color=(1, 1, 0), stroke_width=2, fill=(1, 1, 0, 0.3))
                 )
         annotator.write(self.output_pdf_path)
+        
+    self.highlight_pdf(matching_lines)
+    return f"Highlighted PDF saved to: {self.output_pdf_path}"
 
-    def run(self):
-        self.extract_text()
-        if not self.lines:
-            return "No text extracted from the PDF."
-        line_emb, q_emb = self.make_embeddings()
-        matching_lines = self.find_matching_lines(line_emb, q_emb)
-        if not matching_lines:
-            return "No matching lines found above threshold."
-        self.highlight_pdf(matching_lines)
-        return f"Highlighted PDF saved to: {self.output_pdf_path}"
