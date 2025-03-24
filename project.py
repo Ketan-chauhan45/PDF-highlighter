@@ -8,11 +8,11 @@ from pdf_annotate import PdfAnnotator, Location, Appearance
 import pdfplumber
 
 class Project:
-    def __init__(self, pdf_path, model_path, query, threshold, output_pdf_path=None):
+    def __init__(self, pdf_path, model_path, query, threshold=50, output_pdf_path=None):
         self.pdf_path = pdf_path
         self.model_path = model_path
         self.query = query
-        self.threshold = threshold
+        self.threshold = threshold 
         self.output_pdf_path = output_pdf_path or os.path.splitext(pdf_path)[0] + "_highlighted.pdf"
         self.lines = []  # List of dicts with text and bounding box info
 
