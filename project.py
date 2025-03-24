@@ -8,7 +8,7 @@ from pdf_annotate import PdfAnnotator, Location, Appearance
 import pdfplumber
 
 class Project:
-    def __init__(self, pdf_path, model_path, query, threshold=0.9, output_pdf_path=None):
+    def __init__(self, pdf_path, model_path, query, threshold, output_pdf_path=None):
         self.pdf_path = pdf_path
         self.model_path = model_path
         self.query = query
